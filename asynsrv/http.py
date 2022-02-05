@@ -1,6 +1,6 @@
 import asyncio
-__all__ = ['Request']
-class Request:
+__all__ = ['httpreq', 'httprsp']
+class httpreq:
     def __init__(self, addr):
         self.start = {}
         self.header = {}
@@ -61,3 +61,30 @@ class Request:
             + '\nStart line:\n\t' + '\n\t'.join(['%s:%s' % item for item in self.start.items()])\
             + '\nHeader:\n\t'+'\n\t'.join(['%s:%s' % item for item in self.header.items()])\
             + '\nBody:\n\t'+ repr(self.body)
+
+class httprsp:
+    def __init__(self, upg):
+        self.msg = {'version': 'HTTP/1.1',
+                    'code': '200',
+                    'text': 'OK',
+                    'Connection': 'Keep-Alive',
+                    'Content-Length': 0,
+                    'Content-Type': 'Content-Type: text/html; charset=utf-8',
+                    'body': ''}
+        self.msg.update(upg)
+    
+    async def send(self, loop, conn):
+        if self.msg.get('auth',1):
+            self.msg.pop('auth')
+            status = ' '.join([self.msg.pop(k) for k in ['version', 'code', 'text']])
+            body = self.msg.pop('body')
+            self.msg['Content-Length'] = len(body)
+            header = '\r\n'.join(['%s: %s' % item for item in self.msg.items()])
+            rsp = (status + '\r\n' + header + '\r\n\r\n' + body).encode()
+            await loop.sock_sendall(conn, rsp)
+        else:
+            err = b'HTTP/1.1 404\r\n'\
+                  b'Connection: keep-alive\r\n'\
+                  b'Content-Length: 22\r\n\r\n'\
+                  b'<h1>404 not found</h1>'
+            await loop.sock_sendall(conn, err)
