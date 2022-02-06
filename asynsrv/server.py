@@ -1,5 +1,6 @@
 import asyncio, socket
 from .http import httpreq, httprsp
+from .websocket import wsrecv, wssend
 __all__ = ['server']
 
 class server:
@@ -10,7 +11,7 @@ class server:
         self.loop = asyncio.new_event_loop()
         self.ws = {}
     
-    def start(self, func):
+    def start(self, func, param = {}):
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         while True:
             try:
@@ -21,6 +22,10 @@ class server:
         self.server.listen()
         self.server.setblocking(False)
         self.func = func
+        self.param = param
+        self.param['serverip'] = self.ip
+        self.param['serverport'] = self.port
+        self.param['ws'] = {}
         print('Start server at %s:%d' %(self.ip, self.port))
         self.loop.run_until_complete(self.listen())
     
@@ -40,12 +45,43 @@ class server:
                 conn.close()
                 return
             print(req)
-            rsp = httprsp(self.func(req))
+            msg, self.param = self.func(req, self.param)
+            rsp = httprsp(req, msg)
             await rsp.send(self.loop, conn)
+            
             print(addr, 'Complete response')
             if req.header.get('Connection','None') != 'keep-alive':
                 print(addr, 'Connection close')
                 break
             print(addr, 'Connection reuse')
-        conn.close()
-        print(addr, 'Connection close')
+        if rsp.msg.get('Upgrade','None') == 'websocket':
+            self.loop.create_task(self.wsconn(conn,addr))
+            print(addr, 'Start websocket connection')
+        else:
+            conn.close()
+            print(addr, 'Connection close')
+    
+    async def wsconn(self, conn, addr):
+        print(addr,'Start websocket connection')
+        self.ws[addr] = conn
+        #if 1:
+            #self.loop.create_task(self.wspolling(conn,addr,30))
+        while True:
+            wsreq = wsrecv(self.loop)
+            try:
+                await wsreq.recv(conn) #message from client
+            except:
+                conn.close()
+                break
+            print(wsreq)
+            #msg = self.func(wsreq, self.param)
+            msg = {}
+            wsrsp = wssend(self.loop, wsreq.data, msg)
+            await wsrsp.send(conn)
+            print(addr, 'Complete response')
+        print(addr, 'websocket close')
+        self.ws.pop(addr)
+        
+
+    async def wspolling(self, conn, addr, time):
+        a=1

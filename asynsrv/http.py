@@ -1,4 +1,5 @@
 import asyncio
+from .websocket import wstoken
 __all__ = ['httpreq', 'httprsp']
 class httpreq:
     def __init__(self, addr):
@@ -63,24 +64,38 @@ class httpreq:
             + '\nBody:\n\t'+ repr(self.body)
 
 class httprsp:
-    def __init__(self, upg):
-        self.msg = {'version': 'HTTP/1.1',
-                    'code': '200',
-                    'text': 'OK',
-                    'Connection': 'Keep-Alive',
-                    'Content-Length': 0,
-                    'Content-Type': 'Content-Type: text/html; charset=utf-8',
-                    'body': ''}
-        self.msg.update(upg)
+    def __init__(self, req, upg):
+        if req.header.get('Upgrade','None') == 'websocket':
+            wskey = wstoken(req.header['Sec-WebSocket-Key'])
+            self.msg = {'version': 'HTTP/1.1',
+                        'code': '101',
+                        'text': 'Switching Protocols',
+                        'Connection': 'Upgrade',
+                        'Content-Length': 0,
+                        'Sec-WebSocket-Accept': wskey,
+                        'Upgrade': 'websocket',
+                        'body': ''}
+            #self.msg.update(upg)
+        else:
+            self.msg = {'version': 'HTTP/1.1',
+                        'code': '200',
+                        'text': 'OK',
+                        'Connection': 'Keep-Alive',
+                        'Content-Length': 0,
+                        'Content-Type': 'Content-Type: text/html; charset=utf-8',
+                        'body': ''}
+            self.msg.update(upg)
     
     async def send(self, loop, conn):
         if self.msg.get('auth',1):
-            self.msg.pop('auth')
+            if 'auth' in self.msg: self.msg.pop('auth')
             status = ' '.join([self.msg.pop(k) for k in ['version', 'code', 'text']])
             body = self.msg.pop('body')
-            self.msg['Content-Length'] = len(body)
+            if len(body): self.msg['Content-Length'] = len(body)
+            else: self.msg.pop('Content-Length')
             header = '\r\n'.join(['%s: %s' % item for item in self.msg.items()])
             rsp = (status + '\r\n' + header + '\r\n\r\n' + body).encode()
+            print(rsp)
             await loop.sock_sendall(conn, rsp)
         else:
             err = b'HTTP/1.1 404\r\n'\

@@ -1,14 +1,14 @@
 import asynsrv
-def asg(mfc):
+def asg(req, param):
     cat={
         1:test,
     }
-    mtc = cat.get(1,test)
-    return mtc()
-def test():
-    msg = {'auth': 0,
+    task = cat.get(1,test)
+    return task(req, param)
+def test(req, param):
+    msg = {'auth': 1,
            'text': 'Hello World',
            'body': '<h1>Hello World</h1>'}
-    return msg
+    return msg, param
 s=asynsrv.server()
 s.start(asg)
