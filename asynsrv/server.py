@@ -9,7 +9,7 @@ class server:
         self.port = port
         self.timeout = 5
         self.loop = asyncio.new_event_loop()
-        self.ws = {}
+        self.ws = {} #{addr: conn}
     
     def start(self, func, param = {}):
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -35,9 +35,8 @@ class server:
             self.loop.create_task(self.httpconn(conn,addr))
 
     async def httpconn(self, conn, addr):
-        print(addr,'Start connection')
+        self.debug(str(addr) + 'Start connection')
         while True:
-            t = self.timeout
             req = httpreq(addr)
             try:
                 await req.recv(self.loop, conn) #message from client
@@ -45,27 +44,33 @@ class server:
                 conn.close()
                 return
             print(req)
-            msg, self.param = self.func(req, self.param)
-            rsp = httprsp(req, msg)
+            msg, self.param = self.func(req.data, self.param)
+            wspush = msg.pop('WSPUSH',0)
+            rsp = httprsp(msg, req.data)
             await rsp.send(self.loop, conn)
-            
-            print(addr, 'Complete response')
-            if req.header.get('Connection','None') != 'keep-alive':
-                print(addr, 'Connection close')
+            if wspush:
+                for key in wspush:
+                    if self.param['ws'].get(key, 0):
+                        print('key:',key)
+                        print('wspushkey', wspush[key])
+                        wsrsp = wssend(self.loop, {}, wspush[key])
+                        await wsrsp.send(self.param['ws'][key])
+            self.debug(str(addr) + 'Complete response')
+            if rsp.data.get('Upgrade','None') == 'websocket':
+                self.loop.create_task(self.wsconn(conn, addr, msg))
+                self.debug(str(addr) + 'Start websocket connection')
+                return
+            elif rsp.data.get('Connection','None') != 'keep-alive':
+                self.debug(str(addr) + 'Connection close')
                 break
-            print(addr, 'Connection reuse')
-        if rsp.msg.get('Upgrade','None') == 'websocket':
-            self.loop.create_task(self.wsconn(conn,addr))
-            print(addr, 'Start websocket connection')
-        else:
-            conn.close()
-            print(addr, 'Connection close')
+            self.debug(str(addr) + 'Connection reuse')
+        conn.close()
+        self.debug(str(addr) + 'Connection close')
     
-    async def wsconn(self, conn, addr):
-        print(addr,'Start websocket connection')
-        self.ws[addr] = conn
-        #if 1:
-            #self.loop.create_task(self.wspolling(conn,addr,30))
+    async def wsconn(self, conn, addr, msg):
+        self.debug(str(addr) + 'Start websocket connection')
+        self.param['ws'][addr] = conn
+        print('ws:', self.param['ws'])
         while True:
             wsreq = wsrecv(self.loop)
             try:
@@ -74,14 +79,33 @@ class server:
                 conn.close()
                 break
             print(wsreq)
-            #msg = self.func(wsreq, self.param)
-            msg = {}
-            wsrsp = wssend(self.loop, wsreq.data, msg)
-            await wsrsp.send(conn)
+            if wsreq.data['opcode'] == 9:
+                wsrsp = wssend(self.loop, wsreq.data, {})
+                await wsrsp.send(conn)
+            else:
+                msg, self.param = self.func(wsreq.data, self.param)
+                if 'PUSH' in msg:
+                    self.loop.create_task(self.wsph(conn,addr,msg))
+                    print('start wsph')
+                else:
+                    wsrsp = wssend(self.loop, wsreq.data, msg)
+                    await wsrsp.send(conn)
+            if not msg:
+                conn.close()
+                break
             print(addr, 'Complete response')
         print(addr, 'websocket close')
-        self.ws.pop(addr)
+        self.param['ws'].pop(addr)
         
 
-    async def wspolling(self, conn, addr, time):
-        a=1
+    async def wsph(self, conn, addr, msg):
+        while 'PUSH' in msg and addr in self.param['ws']:
+            msg, self.param = self.func(msg, self.param)
+            wsrsp = wssend(self.loop, {}, msg)
+            await wsrsp.send(conn)
+            await asyncio.sleep(msg.get('PUSH',0))
+        print('end ws push')
+    
+    def debug(self, c):
+        if self.param.get('DEBUG', 1):
+            print(c)

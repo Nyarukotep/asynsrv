@@ -1,9 +1,8 @@
+__all__ = ['wstoken', 'wsrecv', 'wssend']
 import base64,hashlib
 from cmath import exp
 import asyncio
 
-from unittest2 import expectedFailure
-__all__ = ['wstoken', 'wsrecv', 'wssend']
 def wstoken(wskey):
     GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
     wskey = wskey + GUID
@@ -86,16 +85,16 @@ class wssend:
         if upg:
             self.data.update(upg)
         else:
-            self.data['body'] = wsreq['body']
-            if wsreq['opcode'] == 9: self.data['opcode'] == 10
+            if wsreq['opcode'] == 9:
+                self.data['opcode'] == 10
+            else:
+                self.data['body'] = 'Close'
 
     async def send(self, conn):
-        if self.data.get('auth',1):
-            if 'auth' in self.data: self.data.pop('auth')
+        if self.data.pop('AUTH', 1):
             msg = b''
             fstr = (((self.data['FIN']<<3)^self.data['RSV'])<<4)^self.data['opcode']
             msg += bytes.fromhex('{0:0{1}x}'.format(fstr, 2))
-
             body = self.data['body'].encode()
             if len(body) < 126:
                 msg += bytes.fromhex('{0:0{1}x}'.format(len(body), 2))
