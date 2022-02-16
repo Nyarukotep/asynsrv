@@ -9,8 +9,9 @@ def wstoken(wskey):
     return base64.b64encode(hashlib.sha1(wskey.encode('utf-8')).digest()).decode()
 
 class wsrecv:
-    def __init__(self, loop):
+    def __init__(self, loop, addr):
         self.data = {}
+        self.data['addr'] = addr
         self.loop = loop
         self.cache = b''
         self.body = ''
@@ -98,13 +99,14 @@ class wssend:
             body = self.data['body'].encode()
             if len(body) < 126:
                 msg += bytes.fromhex('{0:0{1}x}'.format(len(body), 2))
-            elif len(body) == 126:
+            elif len(body) < 65536:
                 msg += b'\x7e'
                 msg += bytes.fromhex('{0:0{1}x}'.format(len(body), 4))
             else:
                 msg += b'\x7f'
                 msg += bytes.fromhex('{0:0{1}x}'.format(len(body), 16))
             msg += body
+            print(msg)
             await self.loop.sock_sendall(conn, msg)
         else:
             err = b'HTTP/1.1 404\r\n'\

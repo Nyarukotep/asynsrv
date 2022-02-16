@@ -9,6 +9,8 @@ def asg(reqd, param):
         }
         task = cat.get(reqd['body'], echo)
         return task(reqd, param)
+    elif 'PUSHID' in reqd:
+        return sstime(reqd, param)
     else:
         cat={
             '/': hello,
@@ -22,7 +24,7 @@ def eee(reqd, param):
     return msg, param
 
 def stime(reqd, param):
-    msg = {'PUSH':5,'body':'time'}
+    msg = {'PUSH':5, 'PUSHID':1, 'body':'time'}
     return msg, param
 
 def echo(reqd, param):
@@ -33,9 +35,9 @@ def hello(reqd, param):
     msg = {'AUTH': 1,
             'text': 'Hello World',
             'body': '<h1>Hello World</h1>'}
-    if param['ws']:
+    if param['WS']:
         w = {}
-        wsmsg = param['ws']
+        wsmsg = param['WS']
         for key in wsmsg:
             w[key] = {'body':'helloworld'}
         msg['WSPUSH'] = w
@@ -45,7 +47,7 @@ def close(reqd, param):
     return {}, param
 
 def sstime(reqd, param):
-    return {'PUSH':5,'body': time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())},param
+    return {'PUSH':5,'PUSHID':1, 'body': time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())},param
 
 s=asynsrv.server()
 s.start(asg)

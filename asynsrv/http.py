@@ -6,10 +6,10 @@ class httpreq:
         self.data = {}
         self.data['addr'] = addr
         self.cache = ''
-    async def recv(self, loop, conn):
+    async def recv(self, loop, conn, timeout):
         while self.data.get('Content-Length',1):
             try:
-                buffer = await asyncio.wait_for(self.sock_recv(loop, conn),5)
+                buffer = await asyncio.wait_for(self.sock_recv(loop, conn),timeout)
             except asyncio.TimeoutError:
                 print(self.data['addr'], 'Connection close due to timeout')
                 raise Exception
