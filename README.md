@@ -85,5 +85,30 @@ The dictionary `req` passed into `fun` in websocket contains the information sen
 ```
 `FIN` identifies whether the message ends, 1 indicates the end of the message, 0 indicates there is follow-up data. `RSV` is the decimal representation of `RSV1`, `RSV2`, and `RSV3` in the websocket protocol, which is used for expansion, and `OPCODE` is a four-digit binary decimal representation, which is used to indicate the message reception type. `MASK` is used to identify whether the data is masked or not. `KEY` is the mask, `body` is the decoded message body.
 ### Send
+Asyncsrv generates and sends websocket messages via the `msg` returned by `func`. A simplest `msg` has the following structure  
+```
+{
+    'body': 'message',
+}
+```
+Required parameters that are not specified will be automatically filled in. The default value is
+```
+{
+    'FIN': 1,
+    'RSV': 1,
+    'opcode':1,
+    'body': '',
+}
+```
+The websocket connection will be closed if `msg` is empty. If the received websocket message is a ping request, it will respond directly without passing in `func`.
+
 ### Push
+Asyncsrv supports two ways to push messages from the server, one is polling, by including key `PUSH` in `msg`, the value of `PUSH` is the polling interval. After each specified time, the previous `msg` will be passed to `func` to get the new `msg`. `msg` returned after each poll should contain `PUSH` to keep polling, polling will be closed if there is no key `PUSH`.  
+Another way is to push the websocket message at the same time when sending the http response, which is achieved by including key `WSPUSH` in `msg`. The value of `WSPUSH` should be a dictionary with the following structure
+```
+{
+    'localhost:5000': {'body':'message'},
+    'localhost:5001': {'body':'message'},
+}
+```
 ## Example
