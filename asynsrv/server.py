@@ -4,7 +4,7 @@ from .websocket import wsrecv, wssend
 __all__ = ['server']
 
 class server:
-    def __init__(self, ip = 'localhost', port = 11456):
+    def __init__(self, ip = 'localhost', port = 6655):
         self.ip = ip
         self.port = port
         self.timeout = 5
@@ -24,7 +24,7 @@ class server:
         self.param = param
         self.param['SVRIP'] = self.ip
         self.param['SVRPORT'] = self.port
-        self.param['WS'] = {}
+        self.param['WSCONN'] = {}
         print('Start server at %s:%d' %(self.ip, self.port))
         self.loop.run_until_complete(self.listen())
     
@@ -44,16 +44,16 @@ class server:
                 return
             print(req)
             msg, self.param = self.func(req.data, self.param)
-            wspush = msg.pop('WSPUSH',0)
+            phdict = msg.pop('WSPUSH',0)
             rsp = httprsp(msg, req.data)
             await rsp.send(self.loop, conn)
-            if wspush:
-                for key in wspush:
-                    if self.param['WS'].get(key, 0):
+            if phdict:
+                for key in phdict:
+                    if self.param['WSCONN'].get(key, 0):
                         print('key:',key)
-                        print('wspushkey', wspush[key])
-                        wsrsp = wssend(self.loop, {}, wspush[key])
-                        await wsrsp.send(self.param['WS'][key])
+                        print('wspushkey', phdict[key])
+                        wsrsp = wssend(self.loop, {}, phdict[key])
+                        await wsrsp.send(self.param['WSCONN'][key])
             self.debug(str(addr) + 'Complete response')
             if rsp.data.get('Upgrade','None') == 'websocket':
                 self.loop.create_task(self.wsconn(conn, addr, msg))
@@ -67,8 +67,8 @@ class server:
     
     async def wsconn(self, conn, addr, msg):
         self.debug(str(addr) + 'Start websocket connection')
-        self.param['WS'][addr] = conn
-        print('WS:', self.param['WS'])
+        self.param['WSCONN'][addr] = conn
+        print('WS:', self.param['WSCONN'])
         while True:
             wsreq = wsrecv(self.loop, addr)
             try:
@@ -82,10 +82,10 @@ class server:
                 await wsrsp.send(conn)
             else:
                 msg, self.param = self.func(wsreq.data, self.param)
-                if 'PUSH' in msg:
+                if 'WSPUSH' in msg:
                     self.loop.create_task(self.wsph(conn, addr, msg))
                     print('start wsph')
-                else:
+                elif 'body' in msg:
                     wsrsp = wssend(self.loop, wsreq.data, msg)
                     await wsrsp.send(conn)
             if not msg:
@@ -93,17 +93,17 @@ class server:
                 break
             print(addr, 'Complete response')
         print(addr, 'websocket close')
-        self.param['WS'].pop(addr)
+        self.param['WSCONN'].pop(addr)
         
 
     async def wsph(self, conn, addr, msg):
         msg['addr'] = addr
-        while 'PUSH' in msg and addr in self.param['WS']:
+        while 'WSPUSH' in msg and addr in self.param['WSCONN']:
             msg, self.param = self.func(msg, self.param)
             if 'body' in msg:
                 wsrsp = wssend(self.loop, {}, msg)
                 await wsrsp.send(conn)
-            await asyncio.sleep(msg.get('PUSH',0))
+            await asyncio.sleep(msg.get('WSPUSH',0))
         print('end ws push')
     
     def debug(self, c):
