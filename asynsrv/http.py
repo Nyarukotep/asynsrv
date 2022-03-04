@@ -85,11 +85,12 @@ class httprsp:
                 body = self.data.pop('body')
                 self.data['Content-Length'] = len(body)
                 rsp += '\r\n'.join(['%s: %s' % item for item in self.data.items()])
-                rsp += '\r\n\r\n' + body
+                rsp += '\r\n\r\n'
+                rsp = rsp.encode() + body
             else:
                 rsp += '\r\n'.join(['%s: %s' % item for item in self.data.items()])
                 rsp += '\r\n\r\n'
-            rsp = rsp.encode()
+                rsp = rsp.encode()
         else:
             rsp = b'HTTP/1.1 404\r\n'\
                   b'Connection: keep-alive\r\n'\

@@ -81,7 +81,7 @@ class wssend:
         self.data = {'FIN': 0b1,
                 'RSV': 0b000,
                 'opcode':0b1,
-                'body': '',
+                'body': b'',
                 }
         if upg:
             self.data.update(upg)
@@ -89,14 +89,14 @@ class wssend:
             if wsreq['opcode'] == 9:
                 self.data['opcode'] == 10
             else:
-                self.data['body'] = 'Close'
+                self.data['body'] = b'Close'
 
     async def send(self, conn):
         if self.data.pop('AUTH', 1):
             msg = b''
             fstr = (((self.data['FIN']<<3)^self.data['RSV'])<<4)^self.data['opcode']
             msg += bytes.fromhex('{0:0{1}x}'.format(fstr, 2))
-            body = self.data['body'].encode()
+            body = self.data['body']
             if len(body) < 126:
                 msg += bytes.fromhex('{0:0{1}x}'.format(len(body), 2))
             elif len(body) < 65536:

@@ -3,13 +3,13 @@ import time
 def asg(reqd, param):
     if 'FIN' in reqd:
         if 'Time' in reqd['body']:
-            msg = {'WSPUSH':int(reqd['body'].split()[1]), 'body':'time'}
+            msg = {'WSPUSH':int(reqd['body'].split()[1]), 'body':b'time'}
             return msg, param
         else:
-            msg = {'body':reqd['body']}
+            msg = {'body':reqd['body'].encode()}
             return msg, param
     elif 'WSPUSH' in reqd:
-        return {'WSPUSH':5,'PUSHID':1, 'body': time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())},param
+        return {'WSPUSH':1,'PUSHID':1, 'body': time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()).encode()},param
     else:
         cat={
             '/':hw,
@@ -25,17 +25,17 @@ def ws(reqd, param):
     print(body)
     msg = {'AUTH': 1,
             'text': 'ws',
-            'body': body}
+            'body': body.encode()}
     return msg, param
 
 def hw(reqd, param):
     msg = {'AUTH': 1,
         'text': 'Hello World',
-        'body': '<h1>Hello World</h1>'}
+        'body': b'<h1>Hello World</h1>'}
     if param['WSCONN']:
         wsdict = {}
         for key in param['WSCONN']:
-            wsdict[key] = {'body':'helloworld'}
+            wsdict[key] = {'body':b'helloworld'}
         msg['WSPUSH'] = wsdict
     return msg, param
 
